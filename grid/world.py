@@ -1,6 +1,8 @@
 from grid.lane import GrassLane, LogLane, LilypadLane, TrainLane, CarLane
 from random import randint, choice
-from constants import GRID_WIDTH
+from constants import GRID_WIDTH, TILE_SIZE
+from utils.coords import world_to_screen
+import pygame
 
 class World:
     def __init__(self):
@@ -64,3 +66,56 @@ class World:
     def draw(self, screen, camera_y):
         for lane in self.lanes:
             lane.draw(screen, camera_y)
+
+    def is_grass_obstacle(self, x, y):
+        for lane in self.lanes:
+            if lane.y == y:
+                if isinstance(lane, GrassLane):
+                    for obs in lane.obstacles:
+                        if obs[0] == x:
+                            return True
+                return False
+        return False
+
+    def update_player_log_movement(self, player, dt, camera_y):
+        # Appliquer la vitesse de la bûche si le joueur est dessus
+        px, py = world_to_screen(player.grid_x, player.grid_y, camera_y)
+        player_rect = pygame.Rect(px + 8, py + 8, 48, 48)
+
+        for lane in self.lanes:
+            if lane.y == player.grid_y:
+                speed = lane.get_speed(player_rect, camera_y)
+                if speed != 0:
+                    player.grid_x += speed * dt
+                    
+                    # Vérifier si le joueur sort de l'écran (Game Over)
+                    if player.grid_x < -1 or player.grid_x > GRID_WIDTH + 1:
+                        return True # Indique une mort par sortie d'écran
+        return False
+
+    def check_collisions(self, player, camera_y):
+        # On recrée le rect du joueur pour tester les collisions
+        px, py = world_to_screen(player.grid_x, player.grid_y, camera_y)
+        player_rect = pygame.Rect(px + 8, py + 8, 48, 48)
+
+        for lane in self.lanes:
+            if lane.y == player.grid_y:
+                return lane.check_collision(player_rect, camera_y)
+        return False
+    def snap_player_x(self, x, y):
+        for lane in self.lanes:
+            if lane.y == y:
+                if isinstance(lane, LogLane):
+                    # Si c'est une voie de rivière, on essaie de s'aligner sur une bûche
+                    for log in lane.logs:
+                        log_x, length = log
+                        # Si x est à portée de cette bûche (avec une petite marge)
+                        if log_x - 0.5 <= x <= log_x + length - 0.5:
+                            # On s'aligne sur la section de la bûche (offset entier)
+                            return log_x + round(x - log_x)
+                    # Si pas de bûche, on s'aligne sur la grille (pour la noyade propre)
+                    return round(x)
+                else:
+                    # Pour toutes les autres voies (Herbe, Route, Rail, Nénuphar), on s'aligne sur la grille
+                    return round(x)
+        return round(x)

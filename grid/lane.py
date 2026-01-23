@@ -15,6 +15,10 @@ class Lane:
     def draw(self, screen, camera_y):
         for tile in self.tiles:
             tile.draw(screen, camera_y)
+    def check_collision(self, player_rect, camera_y):
+        return False
+    def get_speed(self, player_rect, camera_y):
+        return 0
 
 class GrassLane(Lane):
     def __init__(self, y_index, previous_lane=None):
@@ -56,6 +60,8 @@ class RiverLane(Lane):
         super().__init__(y_index, (80, 80, 200))
     def update(self, dt):
         pass
+    def check_collision(self, player_rect, camera_y):
+        return True
 
 class LogLane(RiverLane):
     def __init__(self, y_index):
@@ -69,7 +75,7 @@ class LogLane(RiverLane):
         # On remplit la ligne avec des bûches espacées
         x = -3
         while x < GRID_WIDTH + 3:
-            length = random.randint(2, 4)
+            length = random.choice([1, 2, 3])
             self.logs.append([x, length])
             x += length + random.randint(2, 4) # Espace entre les bûches
 
@@ -89,8 +95,23 @@ class LogLane(RiverLane):
         for x, length in self.logs:
             px, py = world_to_screen(x, self.y, camera_y)
             # Dessin de la bûche (marron)
-            rect = pygame.Rect(px + 10, py + 10, length * TILE_SIZE - 10, TILE_SIZE - 20)
+            rect = pygame.Rect(px, py + 10, length * TILE_SIZE, TILE_SIZE - 20)
             pygame.draw.rect(screen, (101, 67, 33), rect)
+    def check_collision(self, player_rect, camera_y):
+        # On vérifie si le joueur est sur une bûche
+        # On réduit la hitbox du joueur pour qu'il doive être bien "sur" la bûche
+        feet_rect = player_rect.inflate(-30, -30)
+        
+        for x, length in self.logs:
+            px, py = world_to_screen(x, self.y, camera_y)
+            log_rect = pygame.Rect(px, py, length * TILE_SIZE, TILE_SIZE)
+            if feet_rect.colliderect(log_rect):
+                return False  # Sauvé !
+        return True
+    def get_speed(self, player_rect, camera_y):
+        # Si on est sur cette ligne, on retourne la vitesse
+        # (On suppose que check_collision a déjà validé qu'on est sur une bûche)
+        return self.speed * self.direction
 
 class LilypadLane(RiverLane):
     def __init__(self, y_index, previous_lane=None):
@@ -146,6 +167,15 @@ class LilypadLane(RiverLane):
             rect = pygame.Rect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10)
             pygame.draw.ellipse(screen, (34, 139, 34), rect)
 
+    def check_collision(self, player_rect, camera_y):
+        feet_rect = player_rect.inflate(-30, -30)
+        for x in self.pads:
+            px, py = world_to_screen(x, self.y, camera_y)
+            pad_rect = pygame.Rect(px, py, TILE_SIZE, TILE_SIZE)
+            if feet_rect.colliderect(pad_rect):
+                return False # Sauvé
+        return True
+
 class TrainLane(Lane):
     def __init__(self, y_index):
         super().__init__(y_index, (70, 70, 70))  # Gris pour la voie ferrée
@@ -160,7 +190,7 @@ class TrainLane(Lane):
         self.cooldown = random.uniform(2, 5)
         self.train_timer = 1
         self.train_active = False
-        self.train_longueur = 100
+        self.train_longueur = 70
         self.train_speed = 100
 
     def update(self, dt):
@@ -182,7 +212,19 @@ class TrainLane(Lane):
                     self.train_active = True  # Activer le train après l'alerte
                     self.alert_timer = self.alert_time
 
-        
+    def check_collision(self, player_rect, camera_y):
+        if self.train_active:
+            px, py = world_to_screen(self.train_position, self.y, camera_y)
+            if self.direction == 1:
+                train_rect = pygame.Rect(px - TILE_SIZE * 100, py, TILE_SIZE * 100, TILE_SIZE)
+            else:
+                train_rect = pygame.Rect(px, py, TILE_SIZE * 100, TILE_SIZE)
+            
+            # On réduit légèrement la hitbox pour être "gentil" avec le joueur
+            hitbox = train_rect.inflate(-20, -20)
+            if player_rect.colliderect(hitbox):
+                return True
+        return False    
 
     def draw(self, screen, camera_y):
         super().draw(screen, camera_y)
@@ -230,3 +272,11 @@ class CarLane(Lane):
             px, py = world_to_screen(car, self.y, camera_y)
             rect = pygame.Rect(px + 5, py + 10, TILE_SIZE - 10, TILE_SIZE - 20)  # Rectangle rouge
             pygame.draw.rect(screen, (200, 0, 0), rect)
+
+    def check_collision(self, player_rect, camera_y):
+        for car in self.cars:
+            px, py = world_to_screen(car, self.y, camera_y)
+            car_rect = pygame.Rect(px + 5, py + 10, TILE_SIZE - 10, TILE_SIZE - 20)
+            if player_rect.colliderect(car_rect):
+                return True
+        return False

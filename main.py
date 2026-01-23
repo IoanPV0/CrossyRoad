@@ -13,7 +13,7 @@ clock = pygame.time.Clock()
 world = World()
 player = Player()
 camera = Camera(scroll_speed=30)
-
+game_started = False
 running = True
 while running:
     dt = clock.tick(FPS) / 1000
@@ -23,6 +23,7 @@ while running:
             running = False
 
         if event.type == pygame.KEYDOWN:
+            game_started = True
             if event.key == pygame.K_UP:
                 player.move(0, 1)
             elif event.key == pygame.K_DOWN:
@@ -32,7 +33,8 @@ while running:
             elif event.key == pygame.K_RIGHT:
                 player.move(1, 0)
 
-    camera.update(dt, player)
+    if game_started:
+        camera.update(dt, player)
     world.update(camera.y, dt)
 
     screen.fill((20, 20, 20))

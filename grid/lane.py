@@ -17,29 +17,134 @@ class Lane:
             tile.draw(screen, camera_y)
 
 class GrassLane(Lane):
-    def __init__(self, y_index):
-        super().__init__(y_index, (70, 170, 70))  # Vert pour l'herbe
+    def __init__(self, y_index, previous_lane=None):
+        super().__init__(y_index, (70, 170, 70))
+        self.obstacles = [] # Liste de (x, type)
+        self.generate_obstacles(previous_lane)
+    def generate_obstacles(self, previous_lane):
+        forbidden_x = set()
+        # Si la ligne précédente est des nénuphars, on ne met pas d'obstacle devant eux
+        if previous_lane and isinstance(previous_lane, LilypadLane):
+            forbidden_x.update(previous_lane.pads)
+
+        nb_obstacles = random.randint(0, 3)
+        candidates = [x for x in range(GRID_WIDTH) if x not in forbidden_x]
+        
+        if candidates:
+            chosen_x = random.sample(candidates, min(nb_obstacles, len(candidates)))
+            for x in chosen_x:
+                obs_type = random.choice(['tree', 'rock'])
+                self.obstacles.append((x, obs_type))
+
     def update(self, dt):
         pass
 
+    def draw(self, screen, camera_y):
+        super().draw(screen, camera_y)
+        for x, obs_type in self.obstacles:
+            px, py = world_to_screen(x, self.y, camera_y)
+            if obs_type == 'tree':
+                # Arbre : Tronc marron + Feuillage vert
+                pygame.draw.rect(screen, (101, 67, 33), (px + 24, py + 32, 16, 32))
+                pygame.draw.rect(screen, (34, 139, 34), (px + 12, py + 10, 40, 30))
+            else:
+                # Rocher : Gris
+                pygame.draw.rect(screen, (100, 100, 100), (px + 10, py + 20, 44, 30))
+
 class RiverLane(Lane):
     def __init__(self, y_index):
-        super().__init__(y_index, (80, 80, 200))  # Bleu pour la rivière
-        self.logs = self.generate_logs()
+        super().__init__(y_index, (80, 80, 200))
+    def update(self, dt):
+        pass
+
+class LogLane(RiverLane):
+    def __init__(self, y_index):
+        super().__init__(y_index)
+        self.direction = random.choice([-1, 1])
+        self.speed = random.uniform(0.5, 3.5)
+        self.logs = []  # Liste de [position_x, longueur]
+        self.generate_logs()
 
     def generate_logs(self):
-        return [random.randint(0, 10) for _ in range(3)]  # Exemple de positions de troncs
+        # On remplit la ligne avec des bûches espacées
+        x = -3
+        while x < GRID_WIDTH + 3:
+            length = random.randint(2, 4)
+            self.logs.append([x, length])
+            x += length + random.randint(2, 4) # Espace entre les bûches
+
+    def update(self, dt):
+        for log in self.logs:
+            log[0] += dt * self.speed * self.direction
+            
+            # Gestion de la sortie d'écran (wrap-around)
+            if self.direction == 1 and log[0] > GRID_WIDTH + 2:
+                log[0] = -log[1] - 2
+            elif self.direction == -1 and log[0] + log[1] < -2:
+                log[0] = GRID_WIDTH + 2
 
     def draw(self, screen, camera_y):
         super().draw(screen, camera_y)
         # Dessiner les troncs
-        for log in self.logs:
-            # Exemple : dessiner des rectangles pour les troncs
-            pass
+        for x, length in self.logs:
+            px, py = world_to_screen(x, self.y, camera_y)
+            # Dessin de la bûche (marron)
+            rect = pygame.Rect(px + 10, py + 10, length * TILE_SIZE - 10, TILE_SIZE - 20)
+            pygame.draw.rect(screen, (101, 67, 33), rect)
+
+class LilypadLane(RiverLane):
+    def __init__(self, y_index, previous_lane=None):
+        super().__init__(y_index)
+        self.pads = []
+        self.generate_pads(previous_lane)
+
+    def generate_pads(self, previous_lane):
+        forbidden_x = set()
+        # Si la ligne précédente est de l'herbe avec obstacles, on évite ces positions
+        if previous_lane and isinstance(previous_lane, GrassLane):
+            for x, _ in previous_lane.obstacles:
+                forbidden_x.add(x)
+        if previous_lane and isinstance(previous_lane, LilypadLane):
+            # On ne place des nénuphars que là où il y en avait avant (sous-ensemble)
+            possible_pads = previous_lane.pads
+            for x in possible_pads:
+                if random.random() < 0.8: # 80% de chance de conserver le nénuphar
+                    self.pads.append(x)
+
+            if len(self.pads) > 4:
+                self.pads = sorted(random.sample(self.pads, 4))
+            
+            # Garantie d'au moins 1 nénuphar si la liste est vide
+            if not self.pads and possible_pads:
+                self.pads.append(random.choice(possible_pads))
+        else:
+            # Génération normale (centrée)
+            valid_candidates = [x for x in range(GRID_WIDTH) if x not in forbidden_x]
+            for x in valid_candidates:
+                dist = abs(x - GRID_WIDTH // 2)
+                prob = 0.8 - (dist * 0.05)
+                if random.random() < prob:
+                    self.pads.append(x)
+            if len(self.pads) > 4:
+                self.pads = sorted(random.sample(self.pads, 4))
+            
+            # Garantie d'au moins 1 nénuphar
+            if not self.pads:
+                if valid_candidates:
+                    self.pads.append(random.choice(valid_candidates))
+                else:
+                    self.pads.append(GRID_WIDTH // 2)
 
     def update(self, dt):
-        # Exemple : les troncs pourraient se déplacer ici
         pass
+
+    def draw(self, screen, camera_y):
+        super().draw(screen, camera_y)
+        for x in self.pads:
+            px, py = world_to_screen(x, self.y, camera_y)
+            # Dessin du nénuphar (vert foncé rond)
+            rect = pygame.Rect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10)
+            pygame.draw.ellipse(screen, (34, 139, 34), rect)
 
 class TrainLane(Lane):
     def __init__(self, y_index):
@@ -112,7 +217,7 @@ class CarLane(Lane):
     def update(self, dt):
         # Déplacer les voitures dans la direction définie
         for i in range(len(self.cars)):
-            self.cars[i] += dt * self.speed * self.direction  # Vitesse de 5 unités par seconde
+            self.cars[i] += dt * self.speed * self.direction
             if self.direction == 1 and self.cars[i] > 10:  # Réinitialiser si hors écran à droite
                 self.cars[i] = -1
             elif self.direction == -1 and self.cars[i] < -1:  # Réinitialiser si hors écran à gauche

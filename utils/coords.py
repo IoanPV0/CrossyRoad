@@ -11,6 +11,6 @@ def world_to_screen(x, y, camera_y):
       y = 0 → haut
       y ↓   → bas
     """
-    px = x * TILE_SIZE + TILE_SIZE*2
+    px = x * TILE_SIZE
     py = SCREEN_HEIGHT - (y * TILE_SIZE - camera_y)
     return px, py

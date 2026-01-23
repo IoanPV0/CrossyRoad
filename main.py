@@ -33,7 +33,7 @@ while running:
                 player.move(1, 0)
 
     camera.update(dt, player)
-    world.update(camera.y)
+    world.update(camera.y, dt)
 
     screen.fill((20, 20, 20))
     world.draw(screen, camera.y)

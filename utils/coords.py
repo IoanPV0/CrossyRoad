@@ -11,6 +11,11 @@ def world_to_screen(x, y, camera_y):
       y = 0 → haut
       y ↓   → bas
     """
-    px = x * TILE_SIZE
+    camera_x = 0
+    if isinstance(camera_y, (tuple, list)):
+        camera_x = camera_y[0]
+        camera_y = camera_y[1]
+
+    px = x * TILE_SIZE - camera_x
     py = SCREEN_HEIGHT - (y * TILE_SIZE - camera_y)
     return px, py

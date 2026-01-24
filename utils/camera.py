@@ -1,4 +1,4 @@
-from constants import SCREEN_HEIGHT, TILE_SIZE
+from constants import SCREEN_HEIGHT, TILE_SIZE, SCREEN_WIDTH
 
 class Camera:
     def __init__(self, scroll_speed):
@@ -8,6 +8,7 @@ class Camera:
     def update(self, dt, player):
         # 1️⃣ pression constante
         self.y += self.scroll_speed * dt
+        self.x = 0
 
         # 2️⃣ follow conditionnel
         FOLLOW_RATIO = 0.55
@@ -19,3 +20,4 @@ class Camera:
         # 3️⃣ on prend le max
         if desired_y > self.y:
             self.y = desired_y
+        self.x = player.grid_x * TILE_SIZE - (SCREEN_WIDTH / 2 - TILE_SIZE / 2)

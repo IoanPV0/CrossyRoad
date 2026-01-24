@@ -10,23 +10,19 @@ class World:
         self.generate_initial()
 
     def generate_initial(self):
-        # 1. Les 2 voies du bas (0, 1) : GrassLane pleines d'arbres (sauf centre pour le spawn)
+        # 1. Les 2 voies du bas (0, 1) : GrassLane pleines d'arbres
         for y in range(3):
-            lane = GrassLane(y)
-            lane.obstacles = []
-            for x in range(GRID_WIDTH):
-                lane.obstacles.append((x, 'tree'))
-            self.lanes.append(lane)
+            self.lanes.append(GrassLane(y, full_of_trees=True))
+
 
         # 2. Les 3 voies suivantes (2, 3, 4) : GrassLane avec arbres sur les côtés
         for y in range(3, 7):
-            lane = GrassLane(y)
-            lane.obstacles = []
-            for x in [0, 1, GRID_WIDTH-2, GRID_WIDTH-1]:
-                lane.obstacles.append((x, 'tree'))
-            self.lanes.append(lane)
+            if y == 5:
+               self.lanes.append(GrassLane(y, forbidden_indices=[6]))
+            else:
+                self.lanes.append(GrassLane(y))
 
-        # 3. Le reste (5 à 14) : Génération aléatoire
+
         for y in range(7, 15):
             choices = [GrassLane, LogLane, LilypadLane, TrainLane, CarLane]
             # Pas plus de 2 lignes de nénuphars à la suite
@@ -89,7 +85,7 @@ class World:
                     player.grid_x += speed * dt
                     
                     # Vérifier si le joueur sort de l'écran (Game Over)
-                    if player.grid_x < -1 or player.grid_x > GRID_WIDTH + 1:
+                    if player.grid_x < 2 or player.grid_x > GRID_WIDTH - 2:
                         return True # Indique une mort par sortie d'écran
         return False
 

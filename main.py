@@ -4,6 +4,8 @@ from constants import *
 from grid.world import World
 from entities.player import Player
 from utils.camera import Camera
+from utils.coords import world_to_screen
+from entities.eagle import Eagle
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -16,10 +18,12 @@ max_y = 5
 
 
 def reset_game():
-    global world, player, camera, game_started, score, max_y
+    global world, player, camera, game_started, score, max_y, eagle
     world = World()
     player = Player()
     camera = Camera(scroll_speed=30)
+    eagle = Eagle()
+    camera.x = player.grid_x * TILE_SIZE - (SCREEN_WIDTH / 2 - TILE_SIZE / 2)
     game_started = False
     score = 0
     max_y = 5
@@ -32,7 +36,7 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN and not eagle.active:
             game_started = True
             if event.key == pygame.K_UP:
                 player.move(0, 1, world)
@@ -44,21 +48,38 @@ while running:
             elif event.key == pygame.K_DOWN:
                 player.move(0, -1, world)
             elif event.key == pygame.K_LEFT:
-                player.move(-1, 0, world)
+                if player.grid_x > 2:
+                    player.move(-1, 0, world)
             elif event.key == pygame.K_RIGHT:
-                player.move(1, 0, world)
+                if player.grid_x < GRID_WIDTH - 3:
+                    player.move(1, 0, world)
 
+    camera_pos = (camera.x, camera.y)
     if game_started:
-        camera.update(dt, player)
-        if world.update_player_log_movement(player, dt, camera.y):
-            reset_game()
-        if world.check_collisions(player, camera.y):
-            reset_game()
+        if not eagle.active:
+            camera.update(dt, player)
+            camera_pos = (camera.x, camera.y)
+            
+            # Vérification de la mort par l'aigle (trop bas ou trop lent)
+            px, py = world_to_screen(player.grid_x, player.grid_y, camera_pos)
+            if py > SCREEN_HEIGHT - TILE_SIZE * 2: # Si le joueur est trop bas (marge de 1 tile)
+                eagle.trigger(px, py)
+            
+            if world.update_player_log_movement(player, dt, camera_pos):
+                reset_game()
+            if world.check_collisions(player, camera_pos):
+                reset_game()
+        else:
+            # Mise à jour de l'aigle
+            if eagle.update(dt):
+                reset_game()
     world.update(camera.y, dt)
-
     screen.fill((20, 20, 20))
-    world.draw(screen, camera.y)
-    player.draw(screen, camera.y)
+    world.draw(screen, camera_pos)
+    if not eagle.has_caught_player:
+        player.draw(screen, camera_pos)
+    eagle.draw(screen)
+
 
     score_text = font.render(f"Score: {score}", True, (255, 255, 255))
     high_score_text = font.render(f"Best: {high_score}", True, (255, 255, 255))

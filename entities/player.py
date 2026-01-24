@@ -4,7 +4,7 @@ from constants import GRID_WIDTH
 
 class Player:
     def __init__(self):
-        self.grid_x = 5
+        self.grid_x = 6
         self.grid_y = 5
         self.color = (250, 250, 250)
 

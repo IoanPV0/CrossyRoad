@@ -1,44 +1,73 @@
 from grid.tile import Tile
 from utils.coords import world_to_screen
-from constants import TILE_SIZE, GRID_WIDTH
+from constants import TILE_SIZE, GRID_WIDTH, SCREEN_WIDTH
 import pygame
 import random
+import math
 
 class Lane:
     def __init__(self, y_index, tile_color):
         self.y = y_index
         self.tiles = [
             Tile(x, y_index, tile_color)
-            for x in range(11)
+            for x in range(-5, GRID_WIDTH + 5)
         ]
 
     def draw(self, screen, camera_y):
         for tile in self.tiles:
             tile.draw(screen, camera_y)
+        self.draw_side_shading(screen, camera_y)
+
+    def draw_side_shading(self, screen, camera_y):
+        # Ombrage gauche (x < 2)
+        px_start, py = world_to_screen(2, self.y, camera_y)
+        if px_start > 0:
+            shadow_surface = pygame.Surface((px_start, TILE_SIZE), pygame.SRCALPHA)
+            shadow_surface.fill((0, 0, 0, 128))
+            screen.blit(shadow_surface, (0, py))
+
+        # Ombrage droite (x >= GRID_WIDTH - 2)
+        px_end, _ = world_to_screen(GRID_WIDTH - 2, self.y, camera_y)
+        if px_end < SCREEN_WIDTH:
+            shadow_surface = pygame.Surface((SCREEN_WIDTH - px_end, TILE_SIZE), pygame.SRCALPHA)
+            shadow_surface.fill((0, 0, 0, 128))
+            screen.blit(shadow_surface, (px_end, py))
+   
+        
     def check_collision(self, player_rect, camera_y):
         return False
     def get_speed(self, player_rect, camera_y):
         return 0
 
 class GrassLane(Lane):
-    def __init__(self, y_index, previous_lane=None):
+    def __init__(self, y_index, previous_lane=None, full_of_trees=False, forbidden_indices=None):
         super().__init__(y_index, (70, 170, 70))
-        self.obstacles = [] # Liste de (x, type)
-        self.generate_obstacles(previous_lane)
-    def generate_obstacles(self, previous_lane):
+        self.obstacles = []
+        self.generate_obstacles(previous_lane, full_of_trees, forbidden_indices)
+    def generate_obstacles(self, previous_lane, full_of_trees, forbidden_indices):
+        for x in range(-5, 2):
+            self.obstacles.append((x, 'tree'))
+        for x in range(GRID_WIDTH - 2, GRID_WIDTH + 5):
+            self.obstacles.append((x, 'tree'))
         forbidden_x = set()
+        if forbidden_indices:
+            forbidden_x.update(forbidden_indices)
         # Si la ligne précédente est des nénuphars, on ne met pas d'obstacle devant eux
         if previous_lane and isinstance(previous_lane, LilypadLane):
             forbidden_x.update(previous_lane.pads)
 
-        nb_obstacles = random.randint(0, 3)
-        candidates = [x for x in range(GRID_WIDTH) if x not in forbidden_x]
-        
-        if candidates:
-            chosen_x = random.sample(candidates, min(nb_obstacles, len(candidates)))
-            for x in chosen_x:
-                obs_type = random.choice(['tree', 'rock'])
-                self.obstacles.append((x, obs_type))
+        if full_of_trees:
+            for x in range(2, GRID_WIDTH - 2):
+                if x not in forbidden_x:
+                    self.obstacles.append((x, 'tree'))
+        else: # Génération aléatoire normale dans la zone jouable
+            nb_obstacles = random.randint(0, 3)
+            candidates = [x for x in range(2, GRID_WIDTH - 2) if x not in forbidden_x]
+            if candidates:
+                chosen_x = random.sample(candidates, min(nb_obstacles, len(candidates)))
+                for x in chosen_x:
+                    self.obstacles.append((x, random.choice(['tree', 'rock'])))
+
 
     def update(self, dt):
         pass
@@ -58,10 +87,31 @@ class GrassLane(Lane):
 class RiverLane(Lane):
     def __init__(self, y_index):
         super().__init__(y_index, (80, 80, 200))
+
     def update(self, dt):
         pass
     def check_collision(self, player_rect, camera_y):
         return True
+    def draw_side_shading(self, screen, camera_y):
+        pass
+    def draw(self, screen, camera_y):
+        super().draw(screen, camera_y)
+        # Animation de la mousse (rectangles oscillants)
+        t = pygame.time.get_ticks() / 200.0
+        
+        # Côté gauche (limite x=1 / x=2)
+        px, py = world_to_screen(1, self.y, camera_y)
+        for i in range(4):
+            offset = math.sin(t + i * 0.5) * 4
+            rect = pygame.Rect(px + TILE_SIZE - 8 + offset, py + i * (TILE_SIZE/4) + 4, 8, 10)
+            pygame.draw.rect(screen, (255, 255, 255, 200), rect)
+
+        # Côté droit (limite x=GRID_WIDTH-2 / x=GRID_WIDTH-3)
+        px, py = world_to_screen(GRID_WIDTH - 2, self.y, camera_y)
+        for i in range(4):
+            offset = math.sin(t + i * 0.5) * 4
+            rect = pygame.Rect(px + offset, py + i * (TILE_SIZE/4) + 4, 8, 10)
+            pygame.draw.rect(screen, (255, 255, 255, 200), rect)
 
 class LogLane(RiverLane):
     def __init__(self, y_index):
@@ -129,7 +179,7 @@ class LilypadLane(RiverLane):
             # On ne place des nénuphars que là où il y en avait avant (sous-ensemble)
             possible_pads = previous_lane.pads
             for x in possible_pads:
-                if random.random() < 0.8: # 80% de chance de conserver le nénuphar
+                if random.random() < 0.6: # 80% de chance de conserver le nénuphar
                     self.pads.append(x)
 
             if len(self.pads) > 4:
@@ -139,8 +189,9 @@ class LilypadLane(RiverLane):
             if not self.pads and possible_pads:
                 self.pads.append(random.choice(possible_pads))
         else:
-            # Génération normale (centrée)
-            valid_candidates = [x for x in range(GRID_WIDTH) if x not in forbidden_x]
+            # Génération normale, uniquement dans la zone jouable
+            valid_candidates = [x for x in range(2, GRID_WIDTH - 2) if x not in forbidden_x]
+
             for x in valid_candidates:
                 dist = abs(x - GRID_WIDTH // 2)
                 prob = 0.8 - (dist * 0.05)
@@ -249,34 +300,44 @@ class TrainLane(Lane):
 class CarLane(Lane):
     def __init__(self, y_index):
         super().__init__(y_index, (128, 128, 128))  # Rouge pour la route
-        self.cars = self.generate_cars()
         self.direction = random.choice([-1, 1])
         self.speed = random.uniform(1, 4)
+        self.cars = [] # Liste de [x, length, color]
+        self.generate_cars()
 
     def generate_cars(self):
-        return [random.randint(0, 10) for _ in range(2)]  # Exemple de positions de voitures
+        x = -4
+        while x < GRID_WIDTH + 4:
+            if random.random() < 0.3:
+                length = 2.5 # Camion (plus long)
+                color = (200, 200, 200) # Gris clair
+            else:
+                length = random.choice([1, 1.5]) # Voiture standard
+                color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255))
+            
+            self.cars.append([x, length, color])
+            x += length + random.uniform(2, 5)
 
     def update(self, dt):
-        # Déplacer les voitures dans la direction définie
-        for i in range(len(self.cars)):
-            self.cars[i] += dt * self.speed * self.direction
-            if self.direction == 1 and self.cars[i] > 10:  # Réinitialiser si hors écran à droite
-                self.cars[i] = -1
-            elif self.direction == -1 and self.cars[i] < -1:  # Réinitialiser si hors écran à gauche
-                self.cars[i] = 10
+        for car in self.cars:
+            car[0] += dt * self.speed * self.direction
+            if self.direction == 1 and car[0] > GRID_WIDTH + 4:
+                car[0] = -4 - car[1]
+            elif self.direction == -1 and car[0] + car[1] < -4:
+                car[0] = GRID_WIDTH + 4
+
 
     def draw(self, screen, camera_y):
         super().draw(screen, camera_y)
-        # Dessiner les voitures
-        for car in self.cars:
-            px, py = world_to_screen(car, self.y, camera_y)
-            rect = pygame.Rect(px + 5, py + 10, TILE_SIZE - 10, TILE_SIZE - 20)  # Rectangle rouge
-            pygame.draw.rect(screen, (200, 0, 0), rect)
+        for x, length, color in self.cars:
+            px, py = world_to_screen(x, self.y, camera_y)
+            rect = pygame.Rect(px + 5, py + 10, length * TILE_SIZE - 10, TILE_SIZE - 20)
+            pygame.draw.rect(screen, color, rect)
 
     def check_collision(self, player_rect, camera_y):
-        for car in self.cars:
-            px, py = world_to_screen(car, self.y, camera_y)
-            car_rect = pygame.Rect(px + 5, py + 10, TILE_SIZE - 10, TILE_SIZE - 20)
-            if player_rect.colliderect(car_rect):
+        for x, length, _ in self.cars:
+            px, py = world_to_screen(x, self.y, camera_y)
+            car_rect = pygame.Rect(px + 5, py + 10, length * TILE_SIZE - 10, TILE_SIZE - 20)
+            if player_rect.colliderect(car_rect.inflate(-10, -10)):
                 return True
         return False

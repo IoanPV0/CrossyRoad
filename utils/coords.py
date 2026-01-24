@@ -5,7 +5,7 @@ def world_to_screen(x, y, camera_y):
     """
     Monde :
       y = 0 → bas
-      y ↑   → avance du joueur
+      y ↑   → avance player
 
     Écran pygame :
       y = 0 → haut

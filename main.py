@@ -9,7 +9,7 @@ from entities.eagle import Eagle
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Moteur Crossy Road")
+pygame.display.set_caption("Crossy Road 2D")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 36)
 high_score = 0
@@ -57,12 +57,13 @@ while running:
     camera_pos = (camera.x, camera.y)
     if game_started:
         if not eagle.active:
+            # gestion camera
             camera.update(dt, player)
             camera_pos = (camera.x, camera.y)
-            
-            # Vérification de la mort par l'aigle (trop bas ou trop lent)
+
+            #gestion aigle
             px, py = world_to_screen(player.grid_x, player.grid_y, camera_pos)
-            if py > SCREEN_HEIGHT - TILE_SIZE * 2: # Si le joueur est trop bas (marge de 1 tile)
+            if py > SCREEN_HEIGHT - TILE_SIZE * 2: # marge de 1 tile
                 eagle.trigger(px, py)
             
             if world.update_player_log_movement(player, dt, camera_pos):
@@ -70,7 +71,6 @@ while running:
             if world.check_collisions(player, camera_pos):
                 reset_game()
         else:
-            # Mise à jour de l'aigle
             if eagle.update(dt):
                 reset_game()
     world.update(camera.y, dt)
@@ -80,7 +80,7 @@ while running:
         player.draw(screen, camera_pos)
     eagle.draw(screen)
 
-
+    #affichage score
     score_text = font.render(f"Score: {score}", True, (255, 255, 255))
     high_score_text = font.render(f"Best: {high_score}", True, (255, 255, 255))
     screen.blit(score_text, (20, 20))

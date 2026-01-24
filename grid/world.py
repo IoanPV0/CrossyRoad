@@ -10,12 +10,12 @@ class World:
         self.generate_initial()
 
     def generate_initial(self):
-        # 1. Les 2 voies du bas (0, 1) : GrassLane pleines d'arbres
+        # Premieres voies = que des arbres (spawn)
         for y in range(3):
             self.lanes.append(GrassLane(y, full_of_trees=True))
 
 
-        # 2. Les 3 voies suivantes (2, 3, 4) : GrassLane avec arbres sur les côtés
+        # Les 3 voies suivantes GrassLane avec arbres sur les cotes (spawn 2)
         for y in range(3, 7):
             if y == 5:
                self.lanes.append(GrassLane(y, forbidden_indices=[6]))
@@ -25,7 +25,7 @@ class World:
 
         for y in range(7, 15):
             choices = [GrassLane, LogLane, LilypadLane, TrainLane, CarLane]
-            # Pas plus de 2 lignes de nénuphars à la suite
+            # Pas plus de 2 lignes de nénuphars a la suite
             if len(self.lanes) >= 2 and isinstance(self.lanes[-1], LilypadLane) and isinstance(self.lanes[-2], LilypadLane):
                 choices.remove(LilypadLane)
             
@@ -40,7 +40,7 @@ class World:
         while self.lanes[-1].y * 64 - camera_y < 640:
             new_y = self.lanes[-1].y + 1
             choices = [GrassLane, LogLane, LilypadLane, TrainLane, CarLane]
-            # Pas plus de 2 lignes de nénuphars à la suite
+            # Pas plus de 2 lignes de nénuphars a la suite
             if len(self.lanes) >= 2 and isinstance(self.lanes[-1], LilypadLane) and isinstance(self.lanes[-2], LilypadLane):
                 choices.remove(LilypadLane)
 
@@ -55,7 +55,7 @@ class World:
             if lane.y * 64 - camera_y < 700
         ]
 
-        # Appeler `update` pour chaque voie avec `dt`
+        # update pour chaque voie
         for lane in self.lanes:
             lane.update(dt)
 
@@ -74,7 +74,7 @@ class World:
         return False
 
     def update_player_log_movement(self, player, dt, camera_y):
-        # Appliquer la vitesse de la bûche si le joueur est dessus
+        # Joueur emporté par la buche
         px, py = world_to_screen(player.grid_x, player.grid_y, camera_y)
         player_rect = pygame.Rect(px + 8, py + 8, 48, 48)
 
@@ -84,13 +84,13 @@ class World:
                 if speed != 0:
                     player.grid_x += speed * dt
                     
-                    # Vérifier si le joueur sort de l'écran (Game Over)
+                    # verif joueur sort de lecran
                     if player.grid_x < 2 or player.grid_x > GRID_WIDTH - 2:
-                        return True # Indique une mort par sortie d'écran
+                        return True
         return False
 
     def check_collisions(self, player, camera_y):
-        # On recrée le rect du joueur pour tester les collisions
+        # Le joueur est un carre pour les collisions
         px, py = world_to_screen(player.grid_x, player.grid_y, camera_y)
         player_rect = pygame.Rect(px + 8, py + 8, 48, 48)
 
@@ -98,20 +98,20 @@ class World:
             if lane.y == player.grid_y:
                 return lane.check_collision(player_rect, camera_y)
         return False
+    #Fonction servant a aligner le joueur sur les buches ou la grid (pas dentre 2)
     def snap_player_x(self, x, y):
         for lane in self.lanes:
             if lane.y == y:
                 if isinstance(lane, LogLane):
-                    # Si c'est une voie de rivière, on essaie de s'aligner sur une bûche
+                    # Alignement buches
                     for log in lane.logs:
                         log_x, length = log
-                        # Si x est à portée de cette bûche (avec une petite marge)
                         if log_x - 0.5 <= x <= log_x + length - 0.5:
-                            # On s'aligne sur la section de la bûche (offset entier)
+                            # On s'aligne sur la section de la buche (offset entier)
                             return log_x + round(x - log_x)
-                    # Si pas de bûche, on s'aligne sur la grille (pour la noyade propre)
+                    # Si pas de bûche on s'aligne sur la grille (noyade)
                     return round(x)
                 else:
-                    # Pour toutes les autres voies (Herbe, Route, Rail, Nénuphar), on s'aligne sur la grille
+                    # pour toutes les autres voies on s'aligne sur la grille
                     return round(x)
         return round(x)

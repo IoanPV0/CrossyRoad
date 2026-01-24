@@ -14,4 +14,5 @@ class Tile:
 
         rect = pygame.Rect(px, py, TILE_SIZE, TILE_SIZE)
         pygame.draw.rect(screen, self.color, rect)
-        pygame.draw.rect(screen, (40, 40, 40), rect, 2)
+        #contour
+        #pygame.draw.rect(screen, (40, 40, 40), rect, 2)

@@ -31,7 +31,7 @@ class World:
             
             lane_type = choice(choices)
             
-            if lane_type in [LilypadLane, GrassLane] and self.lanes:
+            if lane_type in [LilypadLane, GrassLane, CarLane] and self.lanes:
                 self.lanes.append(lane_type(y, previous_lane=self.lanes[-1]))
             else:
                 self.lanes.append(lane_type(y))
@@ -45,7 +45,7 @@ class World:
                 choices.remove(LilypadLane)
 
             lane_type = choice(choices)
-            if lane_type in [LilypadLane, GrassLane]:
+            if lane_type in [LilypadLane, GrassLane, CarLane]:
                 self.lanes.append(lane_type(new_y, previous_lane=self.lanes[-1]))
             else:
                 self.lanes.append(lane_type(new_y))

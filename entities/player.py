@@ -22,5 +22,5 @@ class Player:
     def draw(self, screen, camera_y):
         px, py = world_to_screen(self.grid_x, self.grid_y, camera_y)
 
-        rect = pygame.Rect(px + 8, py + 8, 48, 48)
+        rect = pygame.Rect(px + 17, py + 17, 30, 30)
         pygame.draw.rect(screen, self.color, rect)

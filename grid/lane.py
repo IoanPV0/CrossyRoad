@@ -16,22 +16,23 @@ class Lane:
     def draw(self, screen, camera_y):
         for tile in self.tiles:
             tile.draw(screen, camera_y)
-        self.draw_side_shading(screen, camera_y)
 
     def draw_side_shading(self, screen, camera_y):
         # Ombrage gauche (x < 2)
         px_start, py = world_to_screen(2, self.y, camera_y)
-        if px_start > 0:
-            shadow_surface = pygame.Surface((px_start, TILE_SIZE), pygame.SRCALPHA)
+        w_left = int(px_start)
+        if w_left > 0:
+            shadow_surface = pygame.Surface((w_left, TILE_SIZE), pygame.SRCALPHA)
             shadow_surface.fill((0, 0, 0, 128))
             screen.blit(shadow_surface, (0, py))
 
         # Ombrage droite (x >= GRID_WIDTH - 2)
         px_end, _ = world_to_screen(GRID_WIDTH - 2, self.y, camera_y)
-        if px_end < SCREEN_WIDTH:
-            shadow_surface = pygame.Surface((SCREEN_WIDTH - px_end, TILE_SIZE), pygame.SRCALPHA)
+        w_right = SCREEN_WIDTH - int(px_end)
+        if w_right > 0:
+            shadow_surface = pygame.Surface((w_right, TILE_SIZE), pygame.SRCALPHA)
             shadow_surface.fill((0, 0, 0, 128))
-            screen.blit(shadow_surface, (px_end, py))
+            screen.blit(shadow_surface, (int(px_end), py))
    
         
     def check_collision(self, player_rect, camera_y):
@@ -83,6 +84,7 @@ class GrassLane(Lane):
             else:
                 # Rocher : Gris
                 pygame.draw.rect(screen, (100, 100, 100), (px + 10, py + 20, 44, 30))
+        self.draw_side_shading(screen, camera_y)
 
 class RiverLane(Lane):
     def __init__(self, y_index):
@@ -241,7 +243,7 @@ class TrainLane(Lane):
         self.cooldown = random.uniform(2, 5)
         self.train_timer = 1
         self.train_active = False
-        self.train_longueur = 70
+        self.train_longueur = 40
         self.train_speed = 100
 
     def update(self, dt):
@@ -286,6 +288,21 @@ class TrainLane(Lane):
         for tile in self.tiles:
             tile.color = color
             tile.draw(screen, camera_y)
+        
+        # Dessin des rails
+        # Traverses (Sleepers)
+        for x in range(-5, GRID_WIDTH + 5):
+            px, py = world_to_screen(x, self.y, camera_y)
+            pygame.draw.rect(screen, (101, 67, 33), (px + TILE_SIZE // 2 - 4, py, 8, TILE_SIZE))
+        
+        # Rails horizontaux
+        px_start, py = world_to_screen(-5, self.y, camera_y)
+        px_end, _ = world_to_screen(GRID_WIDTH + 5, self.y, camera_y)
+        width = px_end - px_start + TILE_SIZE
+        
+        pygame.draw.rect(screen, (190, 190, 190), (px_start, py + 6, width, 6))
+        pygame.draw.rect(screen, (190, 190, 190), (px_start, py + TILE_SIZE - 12, width, 6))
+
 
         if self.train_active:
             # Dessiner le train uniquement s'il est actif
@@ -294,14 +311,16 @@ class TrainLane(Lane):
                 rect = pygame.Rect(px - TILE_SIZE * 100, py , TILE_SIZE * 100, TILE_SIZE)   # Train vers la gauche
             else:
                 rect = pygame.Rect(px, py, TILE_SIZE * 100, TILE_SIZE)
-            pygame.draw.rect(screen, (255, 255, 0), rect)  # Jaune pour le train
+            pygame.draw.rect(screen, (255, 255, 0), rect)
+        self.draw_side_shading(screen, camera_y)
 
 
 class CarLane(Lane):
-    def __init__(self, y_index):
-        super().__init__(y_index, (128, 128, 128))  # Rouge pour la route
+    def __init__(self, y_index, previous_lane=None):
+        super().__init__(y_index, (70, 70, 70))
+        self.is_continuation = isinstance(previous_lane, CarLane)
         self.direction = random.choice([-1, 1])
-        self.speed = random.uniform(1, 4)
+        self.speed = random.uniform(0.5, 3)
         self.cars = [] # Liste de [x, length, color]
         self.generate_cars()
 
@@ -309,7 +328,7 @@ class CarLane(Lane):
         x = -4
         while x < GRID_WIDTH + 4:
             if random.random() < 0.3:
-                length = 2.5 # Camion (plus long)
+                length = 2.2 # Camion
                 color = (200, 200, 200) # Gris clair
             else:
                 length = random.choice([1, 1.5]) # Voiture standard
@@ -329,10 +348,24 @@ class CarLane(Lane):
 
     def draw(self, screen, camera_y):
         super().draw(screen, camera_y)
+
+        if self.is_continuation:
+            px_start, py = world_to_screen(-5, self.y, camera_y)
+            px_end, _ = world_to_screen(GRID_WIDTH + 5, self.y, camera_y)
+            
+            line_y = py + TILE_SIZE
+            dash_width = 20
+            gap_width = 20
+            current_x = px_start
+            while current_x < px_end:
+                pygame.draw.rect(screen, (200, 200, 200), (current_x, line_y - 2, dash_width, 4))
+                current_x += dash_width + gap_width
+
         for x, length, color in self.cars:
             px, py = world_to_screen(x, self.y, camera_y)
             rect = pygame.Rect(px + 5, py + 10, length * TILE_SIZE - 10, TILE_SIZE - 20)
             pygame.draw.rect(screen, color, rect)
+        self.draw_side_shading(screen, camera_y)
 
     def check_collision(self, player_rect, camera_y):
         for x, length, _ in self.cars:

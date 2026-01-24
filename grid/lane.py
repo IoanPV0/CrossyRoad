@@ -146,9 +146,14 @@ class LogLane(RiverLane):
         # Dessiner les troncs
         for x, length in self.logs:
             px, py = world_to_screen(x, self.y, camera_y)
-            # Dessin de la bûche (marron)
+            # Dessin de la bûche (marron avec bords arrondis)
             rect = pygame.Rect(px, py + 10, length * TILE_SIZE, TILE_SIZE - 20)
-            pygame.draw.rect(screen, (101, 67, 33), rect)
+            pygame.draw.rect(screen, (101, 67, 33), rect, border_radius=10)
+            
+            # Détails (stries bois plus foncées)
+            wood_dark = (85, 55, 25)
+            pygame.draw.line(screen, wood_dark, (px + 15, py + 20), (px + length * TILE_SIZE - 15, py + 20), 3)
+            pygame.draw.line(screen, wood_dark, (px + 15, py + 35), (px + length * TILE_SIZE - 15, py + 35), 3)
     def check_collision(self, player_rect, camera_y):
         # On vérifie si le joueur est sur une bûche
         # On réduit la hitbox du joueur pour qu'il doive être bien "sur" la bûche
@@ -217,8 +222,19 @@ class LilypadLane(RiverLane):
         for x in self.pads:
             px, py = world_to_screen(x, self.y, camera_y)
             # Dessin du nénuphar (vert foncé rond)
-            rect = pygame.Rect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10)
-            pygame.draw.ellipse(screen, (34, 139, 34), rect)
+            center_x = px + TILE_SIZE // 2
+            center_y = py + TILE_SIZE // 2
+            radius = (TILE_SIZE - 10) // 2
+            pygame.draw.circle(screen, (34, 139, 34), (center_x, center_y), radius)
+            
+            # Encoche (triangle couleur eau pour simuler la transparence)
+            water_color = (80, 80, 200)
+            points = [
+                (center_x, center_y),
+                (center_x + radius, center_y - 8),
+                (center_x + radius, center_y + 8)
+            ]
+            pygame.draw.polygon(screen, water_color, points)
 
     def check_collision(self, player_rect, camera_y):
         feet_rect = player_rect.inflate(-30, -30)
@@ -245,6 +261,8 @@ class TrainLane(Lane):
         self.train_active = False
         self.train_longueur = 40
         self.train_speed = 100
+        self.train_colors = [(253, 184, 19), (220, 50, 50), (50, 150, 220)]
+        self.current_train_color = random.choice(self.train_colors)
 
     def update(self, dt):
         if self.train_active:
@@ -263,6 +281,7 @@ class TrainLane(Lane):
                 self.alert_timer -= dt
                 if self.alert_timer <= 0:
                     self.train_active = True  # Activer le train après l'alerte
+                    self.current_train_color = random.choice(self.train_colors)
                     self.alert_timer = self.alert_time
 
     def check_collision(self, player_rect, camera_y):
@@ -307,11 +326,26 @@ class TrainLane(Lane):
         if self.train_active:
             # Dessiner le train uniquement s'il est actif
             px, py = world_to_screen(self.train_position, self.y, camera_y)
+            
+             # Train simplifié (Rectangle rouge avec bande)
+            train_color = self.current_train_color
+            visual_length = TILE_SIZE * self.train_longueur # Assez long pour couvrir l'écran
+
             if self.direction == 1:
-                rect = pygame.Rect(px - TILE_SIZE * 100, py , TILE_SIZE * 100, TILE_SIZE)   # Train vers la gauche
+                # Vers la droite : le corps est à gauche de px
+                rect = pygame.Rect(px - visual_length, py + 5, visual_length, TILE_SIZE - 10)
+                light_rect = pygame.Rect(px - 5, py + 10, 5, TILE_SIZE - 20)
             else:
-                rect = pygame.Rect(px, py, TILE_SIZE * 100, TILE_SIZE)
-            pygame.draw.rect(screen, (255, 255, 0), rect)
+                # Vers la gauche : le corps est à droite de px
+                rect = pygame.Rect(px, py + 5, visual_length, TILE_SIZE - 10)
+                light_rect = pygame.Rect(px, py + 10, 5, TILE_SIZE - 20)
+
+            pygame.draw.rect(screen, train_color, rect, border_radius=5)
+            # Bande décorative
+            pygame.draw.rect(screen, (255, 255, 255), (rect.x, rect.y + 12, rect.width, 6))
+            # Phare jaune
+            pygame.draw.rect(screen, (255, 255, 0), light_rect)
+
         self.draw_side_shading(screen, camera_y)
 
 
@@ -363,8 +397,35 @@ class CarLane(Lane):
 
         for x, length, color in self.cars:
             px, py = world_to_screen(x, self.y, camera_y)
-            rect = pygame.Rect(px + 5, py + 10, length * TILE_SIZE - 10, TILE_SIZE - 20)
-            pygame.draw.rect(screen, color, rect)
+            
+            car_w = length * TILE_SIZE - 10
+            car_h = TILE_SIZE - 20
+            car_x = px + 5
+            car_y = py + 10
+            
+            # Carrosserie
+            pygame.draw.rect(screen, color, (car_x, car_y, car_w, car_h), border_radius=5)
+            
+            # Toit / Pare-brise (plus clair)
+            roof_color = (min(255, color[0] + 50), min(255, color[1] + 50), min(255, color[2] + 50))
+            pygame.draw.rect(screen, roof_color, (car_x + 5, car_y + 5, car_w - 10, car_h - 10), border_radius=3)
+            
+            # Phares et Feux
+            if self.direction == 1: # Vers la droite
+                # Phares Jaunes (Avant Droite)
+                pygame.draw.rect(screen, (255, 255, 0), (car_x + car_w - 4, car_y + 5, 4, 6))
+                pygame.draw.rect(screen, (255, 255, 0), (car_x + car_w - 4, car_y + car_h - 11, 4, 6))
+                # Feux Rouges (Arrière Gauche)
+                pygame.draw.rect(screen, (200, 0, 0), (car_x, car_y + 5, 2, 6))
+                pygame.draw.rect(screen, (200, 0, 0), (car_x, car_y + car_h - 11, 2, 6))
+            else: # Vers la gauche
+                # Phares Jaunes (Avant Gauche)
+                pygame.draw.rect(screen, (255, 255, 0), (car_x, car_y + 5, 4, 6))
+                pygame.draw.rect(screen, (255, 255, 0), (car_x, car_y + car_h - 11, 4, 6))
+                # Feux Rouges (Arrière Droite)
+                pygame.draw.rect(screen, (200, 0, 0), (car_x + car_w - 2, car_y + 5, 2, 6))
+                pygame.draw.rect(screen, (200, 0, 0), (car_x + car_w - 2, car_y + car_h - 11, 2, 6))
+
         self.draw_side_shading(screen, camera_y)
 
     def check_collision(self, player_rect, camera_y):
